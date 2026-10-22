@@ -7,8 +7,8 @@ const makeEvent = (uri: string) => ({
 
 describe('generateOriginRequestHandler', () => {
   test('embeds the key verbatim in the bundled handler', async () => {
-    // $& や $1 は String.prototype.replace の置換パターンとして解釈されないこと
-    const apiKey = 'test-$&-$1-key';
+    // $& や $1 が置換パターンとして解釈されず、引用符やバックスラッシュでコードが壊れないこと
+    const apiKey = 'test-$&-$1-\'"\\-key';
     generateOriginRequestHandler(apiKey);
 
     const bundlePath = path.join(__dirname, '../lambda.bundle/edge-origin-request.js');

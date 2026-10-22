@@ -11,19 +11,35 @@ const makeEvent = (uri: string, querystring = '', method = 'GET') => ({
 });
 
 describe('edge-origin-request', () => {
+  test('rewrites and signs a tile request with its parameters', async () => {
+    const result = await handler(
+      makeEvent('/ex-api/external/XPT001/13/7276/3225.pbf', 'from=20223&to=20234'),
+    );
+    const query = new URLSearchParams(result.querystring);
+
+    expect(result.uri).toBe('/ex-api/external/XPT001');
+    expect(query.get('from')).toBe('20223');
+    expect(query.get('to')).toBe('20234');
+    expect(query.get('response_format')).toBe('pbf');
+    expect(query.get('z')).toBe('13');
+    expect(query.get('x')).toBe('7276');
+    expect(query.get('y')).toBe('3225');
+    expect(result.headers['ocp-apim-subscription-key']).toEqual([
+      { key: 'Ocp-Apim-Subscription-Key', value: '__API_KEY__' },
+    ]);
+  });
+
   test.each([
-    '/ex-api/external/XPT001/13/7276/3225.pbf',
     '/ex-api/external/XPT002/13/7276/3225.pbf',
     '/ex-api/external/XKT002/15/29105/12903.pbf',
+    '/ex-api/external/XKT031/9/454/201.pbf',
     '/ex-api/external/XGT001/14/14552/6451.pbf',
     '/ex-api/external/XST001/14/14552/6451.pbf',
   ])('rewrites and signs tile request %s', async (uri) => {
-    const result = await handler(makeEvent(uri, 'from=20223&to=20234'));
+    const result = await handler(makeEvent(uri));
     const query = new URLSearchParams(result.querystring);
 
     expect(result.uri).toBe(uri.replace(/\/\d+\/\d+\/\d+\.pbf$/, ''));
-    expect(query.get('from')).toBe('20223');
-    expect(query.get('to')).toBe('20234');
     expect(query.get('response_format')).toBe('pbf');
     expect(query.get('z')).toMatch(/^\d+$/);
     expect(query.get('x')).toMatch(/^\d+$/);
@@ -51,6 +67,12 @@ describe('edge-origin-request', () => {
   test.each([
     // undocumented parameters would create unlimited cache keys
     ['/ex-api/external/XPT001/13/7276/3225.pbf', 'from=20223&to=20234&junk=1'],
+    // parameters documented only for another API
+    ['/ex-api/external/XKT013/11/1819/806.pbf', 'from=20223'],
+    ['/ex-api/external/XPT002/13/7276/3225.pbf', 'from=20223'],
+    // API IDs not in the manual
+    ['/ex-api/external/XKT099/13/7276/3225.pbf', ''],
+    ['/ex-api/external/XPT003/13/7276/3225.pbf', ''],
     // the proxy sets these itself
     ['/ex-api/external/XPT001/13/7276/3225.pbf', 'response_format=geojson'],
     ['/ex-api/external/XPT001/13/7276/3225.pbf', 'z=1&x=1&y=1'],
