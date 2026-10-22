@@ -33,8 +33,10 @@ map.addLayer({
 ## 使い方
 
 ```https
-https://du6jhqfvlioa4.cloudfront.net/<不動産ライブラリAPIの任意のパス>/{z}/{x}/{y}.pbf?<任意のクエリパラメータ>
+https://du6jhqfvlioa4.cloudfront.net/ex-api/external/<API ID>/{z}/{x}/{y}.pbf?<任意のクエリパラメータ>
 ```
+* `<API ID>` には不動産情報ライブラリのタイル形式の API（`XPT001` などの `XPT`・`XKT`・`XGT`・`XST` で始まるもの）を指定できます。
+* タイル形式ではない API（`XIT001`、`XIT002`、`XCT001`）や、上記以外のパスには 403 を返します。
 * ソースレイヤー名は `hits` を指定して下さい。
 * 不動産ライブラリ [API操作説明](https://www.reinfolib.mlit.go.jp/help/apiManual) で解説されている任意のクエリパラメータを指定できます。
 

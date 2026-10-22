@@ -16,24 +16,35 @@ export const handler = async (event: any): Promise<any> => {
     };
   }
 
-  const regex = /^(\/.*?)(\/(\d+)\/(\d+)\/(\d+)\.pbf)$/;
+  // 転送するのはタイル API（XPT/XKT/XGT/XST）の {z}/{x}/{y}.pbf 形式だけ
+  // それ以外はAPIキーを付ける前に拒否する
+  const regex = /^(\/ex-api\/external\/X[PKGS]T\d{3})\/(\d+)\/(\d+)\/(\d+)\.pbf$/;
   const match = request.uri.match(regex);
 
-  if (match) {
-    const basePath = match[1];
-    const z = match[3];
-    const x = match[4];
-    const y = match[5];
-
-    const query = new URLSearchParams(request.querystring);
-    query.set('response_format', 'pbf');
-    query.set('z', z);
-    query.set('x', x);
-    query.set('y', y);
-
-    request.uri = basePath;
-    request.querystring = query.toString();
+  if (!match) {
+    return {
+      status: '403',
+      statusDescription: 'Forbidden',
+      headers: {
+        'content-type': [{ key: 'Content-Type', value: 'text/plain' }],
+      },
+      body: 'Forbidden',
+    };
   }
+
+  const basePath = match[1];
+  const z = match[2];
+  const x = match[3];
+  const y = match[4];
+
+  const query = new URLSearchParams(request.querystring);
+  query.set('response_format', 'pbf');
+  query.set('z', z);
+  query.set('x', x);
+  query.set('y', y);
+
+  request.uri = basePath;
+  request.querystring = query.toString();
 
   // APIキーをヘッダーに追加
   request.headers['ocp-apim-subscription-key'] = [
