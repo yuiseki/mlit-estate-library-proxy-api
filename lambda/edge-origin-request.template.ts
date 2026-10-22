@@ -18,18 +18,11 @@ export const handler = async (event: any): Promise<any> => {
 
   // 転送するのはタイル API（XPT/XKT/XGT/XST）の {z}/{x}/{y}.pbf 形式だけ
   // それ以外はAPIキーを付ける前に拒否する
-  const regex = /^(\/ex-api\/external\/X[PKGS]T\d{3})\/(\d+)\/(\d+)\/(\d+)\.pbf$/;
+  const regex = /^(\/ex-api\/external\/X[PKGS]T\d{3})\/(0|[1-9]\d*)\/(0|[1-9]\d*)\/(0|[1-9]\d*)\.pbf$/;
   const match = request.uri.match(regex);
 
   if (!match) {
-    return {
-      status: '403',
-      statusDescription: 'Forbidden',
-      headers: {
-        'content-type': [{ key: 'Content-Type', value: 'text/plain' }],
-      },
-      body: 'Forbidden',
-    };
+    return forbidden();
   }
 
   const basePath = match[1];
@@ -37,7 +30,20 @@ export const handler = async (event: any): Promise<any> => {
   const x = match[3];
   const y = match[4];
 
+  // 上流が配信するズームレベルは全 API を通して 9〜15
+  const zoom = Number(z);
+  if (zoom < 9 || zoom > 15 || Number(x) >= 2 ** zoom || Number(y) >= 2 ** zoom) {
+    return forbidden();
+  }
+
+  // クエリ文字列はキャッシュキーに含まれるので、API操作説明に載っているものだけ受け付ける
   const query = new URLSearchParams(request.querystring);
+  for (const key of query.keys()) {
+    if (!ALLOWED_QUERY_PARAMS.has(key)) {
+      return forbidden();
+    }
+  }
+
   query.set('response_format', 'pbf');
   query.set('z', z);
   query.set('x', x);
@@ -53,3 +59,29 @@ export const handler = async (event: any): Promise<any> => {
 
   return request;
 };
+
+// タイル API の絞り込み用パラメータ（response_format, z, x, y はプロキシが設定する）
+const ALLOWED_QUERY_PARAMS = new Set([
+  'from',
+  'to',
+  'priceClassification',
+  'landTypeCode',
+  'year',
+  'useCategoryCode',
+  'administrativeAreaCode',
+  'prefectureCode',
+  'districtCode',
+  'welfareFacilityClassCode',
+  'welfareFacilityMiddleClassCode',
+  'welfareFacilityMinorClassCode',
+  'disastertype_code',
+]);
+
+const forbidden = () => ({
+  status: '403',
+  statusDescription: 'Forbidden',
+  headers: {
+    'content-type': [{ key: 'Content-Type', value: 'text/plain' }],
+  },
+  body: 'Forbidden',
+});

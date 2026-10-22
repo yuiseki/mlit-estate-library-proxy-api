@@ -33,16 +33,40 @@ describe('edge-origin-request', () => {
     ]);
   });
 
-  test('viewer cannot override the tile coordinates or format', async () => {
-    const result = await handler(
-      makeEvent('/ex-api/external/XPT001/13/7276/3225.pbf', 'response_format=geojson&z=1&x=1&y=1'),
-    );
-    const query = new URLSearchParams(result.querystring);
+  test.each([
+    ['/ex-api/external/XPT002/13/7276/3225.pbf', 'year=2024&priceClassification=0&useCategoryCode=00,03'],
+    ['/ex-api/external/XKT011/13/7276/3225.pbf', 'administrativeAreaCode=13101&welfareFacilityClassCode=01'],
+    ['/ex-api/external/XKT019/9/454/201.pbf', 'prefectureCode=13&districtCode=1'],
+    ['/ex-api/external/XST001/15/29105/12903.pbf', 'disastertype_code=1'],
+    ['/ex-api/external/XKT013/11/1819/806.pbf', ''],
+  ])('forwards documented parameters %s?%s', async (uri, querystring) => {
+    const result = await handler(makeEvent(uri, querystring));
 
-    expect(query.get('response_format')).toBe('pbf');
-    expect(query.get('z')).toBe('13');
-    expect(query.get('x')).toBe('7276');
-    expect(query.get('y')).toBe('3225');
+    expect(result.status).toBeUndefined();
+    for (const [key, value] of new URLSearchParams(querystring)) {
+      expect(new URLSearchParams(result.querystring).get(key)).toBe(value);
+    }
+  });
+
+  test.each([
+    // undocumented parameters would create unlimited cache keys
+    ['/ex-api/external/XPT001/13/7276/3225.pbf', 'from=20223&to=20234&junk=1'],
+    // the proxy sets these itself
+    ['/ex-api/external/XPT001/13/7276/3225.pbf', 'response_format=geojson'],
+    ['/ex-api/external/XPT001/13/7276/3225.pbf', 'z=1&x=1&y=1'],
+    // zoom levels the upstream does not serve
+    ['/ex-api/external/XPT001/8/227/100.pbf', ''],
+    ['/ex-api/external/XPT001/16/58210/25806.pbf', ''],
+    // tile coordinates outside the zoom level
+    ['/ex-api/external/XPT001/9/512/0.pbf', ''],
+    ['/ex-api/external/XPT001/9/0/512.pbf', ''],
+    ['/ex-api/external/XPT001/13/007276/3225.pbf', ''],
+  ])('rejects %s?%s without the key', async (uri, querystring) => {
+    const event = makeEvent(uri, querystring);
+    const result = await handler(event);
+
+    expect(result.status).toBe('403');
+    expect(event.Records[0].cf.request.headers['ocp-apim-subscription-key']).toBeUndefined();
   });
 
   test.each([
